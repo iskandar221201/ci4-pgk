@@ -2,6 +2,8 @@
 
 namespace App\Libraries;
 
+use App\Contracts\StorageDriverInterface;
+use App\Libraries\Storage\LocalDriver;
 use CodeIgniter\HTTP\Files\UploadedFile;
 
 /**
@@ -29,15 +31,18 @@ class FileUploader
      */
     protected array $config;
 
+    protected StorageDriverInterface $driver;
+
     /**
      * @param array<string, mixed> $config
      */
-    public function __construct(array $config = [])
+    public function __construct(array $config = [], ?StorageDriverInterface $driver = null)
     {
         $defaults = [
             'max_size'      => 2048,
             'allowed_types' => ['jpg', 'jpeg', 'png', 'pdf', 'webp'],
             'base_path'     => WRITEPATH . 'uploads' . DIRECTORY_SEPARATOR,
+            'base_url'      => base_url('uploads/'),
             'use_uuid'      => true,
         ];
 
@@ -51,7 +56,14 @@ class FileUploader
             $this->config['base_path'] = $defaults['base_path'];
         }
 
+        if (! isset($this->config['base_url']) || ! is_string($this->config['base_url'])) {
+            $this->config['base_url'] = $defaults['base_url'];
+        }
+
         $this->config['base_path'] = rtrim($this->config['base_path'], DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        $this->config['base_url'] = rtrim($this->config['base_url'], '/') . '/';
+
+        $this->driver = $driver ?? new LocalDriver($this->config['base_path'], $this->config['base_url']);
     }
 
     public function upload(UploadedFile $file, string $module): array
@@ -74,25 +86,22 @@ class FileUploader
         $year = date('Y');
         $month = date('m');
         $relativeDir = $module . '/' . $year . '/' . $month . '/';
-        $destination = rtrim($this->config['base_path'], DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDir);
-
-        if (! is_dir($destination) && ! @mkdir($destination, 0777, true) && ! is_dir($destination)) {
-            throw new \RuntimeException('Failed to create destination directory: ' . $destination);
-        }
 
         $filename = $this->config['use_uuid']
             ? $this->generateUuid() . '.' . $extension
             : $file->getName();
 
-        $movedFile = $file->move($destination, $filename);
-        if (! $movedFile instanceof \CodeIgniter\Files\File) {
-            throw new \RuntimeException('Failed to move file to the destination directory.');
+        $relativePath = 'uploads/' . $relativeDir . $filename;
+        $content = file_get_contents($file->getTempName());
+        if ($content === false) {
+            throw new \RuntimeException('Failed to read uploaded file contents.');
         }
 
-        $relativePath = 'uploads/' . $relativeDir . $filename;
+        $this->driver->put($relativePath, $content);
 
         return [
             'path'      => $relativePath,
+            'url'       => $this->driver->url($relativePath),
             'full_path' => $this->config['base_path'] . str_replace('/', DIRECTORY_SEPARATOR, $relativeDir) . $filename,
             'original'  => $file->getClientOriginalName(),
             'size'      => $file->getSize(),
@@ -103,29 +112,7 @@ class FileUploader
 
     public function delete(string $relativePath): bool
     {
-        try {
-            $normalizedRelativePath = ltrim($relativePath, '/\\');
-
-            if (strpos($normalizedRelativePath, 'uploads/') === 0) {
-                $normalizedRelativePath = substr($normalizedRelativePath, strlen('uploads/'));
-            }
-
-            $fullPath = rtrim($this->config['base_path'], DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $normalizedRelativePath;
-
-            if (! file_exists($fullPath)) {
-                return true;
-            }
-
-            if (! @unlink($fullPath)) {
-                log_message('error', 'Failed to delete uploaded file: ' . $fullPath);
-                return false;
-            }
-
-            return true;
-        } catch (\Throwable $e) {
-            log_message('error', 'Failed to delete uploaded file: ' . $e->getMessage());
-            return false;
-        }
+        return $this->driver->delete($relativePath);
     }
 
     private function generateUuid(): string

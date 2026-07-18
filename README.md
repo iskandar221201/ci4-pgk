@@ -118,9 +118,14 @@ app/
 │   └── JsonBodyFilter.php    # Rejects non-JSON bodies on POST/PUT/PATCH
 ├── Helpers/
 │   └── response_helper.php   # api_success() / api_error() for filter context
+├── Contracts/
+│   └── StorageDriverInterface.php  # Abstraction for pluggable storage backends
 ├── Libraries/
 │   ├── AppLogger.php         # Static facade for structured JSON logging
-│   └── FileUploader.php      # Standardized upload handler for module files
+│   ├── FileUploader.php      # Standardized upload handler for module files
+│   └── Storage/
+│       ├── LocalDriver.php   # Default local filesystem storage driver
+│       └── S3Driver.php      # Optional S3-compatible storage driver
 ├── Models/
 │   ├── BaseModel.php         # Timestamps, soft delete, search/dateRange scopes
 │   └── UserModel.php         # Extends Shield's UserModel + QueryScopesTrait
@@ -243,6 +248,7 @@ It supports:
 - configurable max size and allowed extensions
 - UUID-based filenames by default
 - structured storage under writable/uploads/{module}/{year}/{month}/
+- pluggable storage drivers with Local as the default and optional S3-compatible support
 - deletion of old files when replacing uploads
 
 Example usage:
@@ -250,6 +256,17 @@ Example usage:
 ```php
 $uploader = new \App\Libraries\FileUploader();
 $result = $uploader->upload($file, 'avatar');
+```
+
+Optional S3 usage:
+
+```php
+$uploader = new \App\Libraries\FileUploader([], new \App\Libraries\Storage\S3Driver([
+    'bucket' => env('S3_BUCKET'),
+    'region' => env('S3_REGION'),
+    'key'    => env('S3_KEY'),
+    'secret' => env('S3_SECRET'),
+]));
 ```
 
 ---
