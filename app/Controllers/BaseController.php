@@ -6,6 +6,8 @@ use CodeIgniter\Controller;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 use Psr\Log\LoggerInterface;
+use App\Traits\ApiResponseTrait;
+use App\Traits\LoggableTrait;
 
 /**
  * BaseController provides a convenient place for loading components
@@ -20,6 +22,11 @@ use Psr\Log\LoggerInterface;
  */
 abstract class BaseController extends Controller
 {
+    use ApiResponseTrait;
+    use LoggableTrait;
+
+    protected ?object $currentUser = null;
+
     /**
      * Be sure to declare properties for any property fetch you initialized.
      * The creation of dynamic property is deprecated in PHP 8.2.
@@ -41,5 +48,10 @@ abstract class BaseController extends Controller
 
         // Preload any models, libraries, etc, here.
         // $this->session = service('session');
+
+        $this->helpers = array_merge($this->helpers, ['response']);
+        if (function_exists('auth') && auth()->loggedIn()) {
+            $this->currentUser = auth()->user();
+        }
     }
 }
