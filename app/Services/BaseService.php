@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\BaseModel;
+use CodeIgniter\Model;
 use App\Validation\BaseValidator;
 use App\Exceptions\ServiceException;
 use App\Exceptions\ValidationException;
@@ -15,7 +15,7 @@ abstract class BaseService
     /** @var string Must be set in the child class to bind a Model. */
     protected string $modelClass;
     
-    protected ?BaseModel $model = null;
+    protected ?Model $model = null;
     protected BaseValidator $validator;
 
     public function __construct()
