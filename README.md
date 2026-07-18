@@ -18,6 +18,8 @@ A production-ready CodeIgniter 4 starter kit with structured API responses, Shie
 - [API Response Envelope](#api-response-envelope)
 - [Filter Stack](#filter-stack)
 - [Logging](#logging)
+- [File Uploads](#file-uploads)
+- [Transformers](#transformers)
 - [Audit Trail](#audit-trail)
 - [How to Add a New Resource](#how-to-add-a-new-resource)
 - [Server Requirements](#server-requirements)
@@ -78,6 +80,18 @@ Request → Filter Stack → Controller → Service → Model → Database
 | **Transformer** | Shapes and sanitizes response payloads before they reach the API response layer. |
 | **Model** | App models extend `BaseModel` (soft delete, search/dateRange scopes). Shield-based models extend `ShieldUserModel` directly. Both are compatible with `BaseService`. |
 
+### Lifecycle Hooks
+
+Override any of these in your Service to react to CRUD events without touching `BaseService`:
+
+```php
+protected function afterCreate(int|string $id, array $data): void
+protected function afterUpdate(int|string $id, array $data): void
+protected function afterDelete(int|string $id, array $oldData): void
+```
+
+Hook failures are non-blocking — they log to `log_message()` and never break the main operation.
+
 ---
 
 ## Project Structure
@@ -105,7 +119,8 @@ app/
 ├── Helpers/
 │   └── response_helper.php   # api_success() / api_error() for filter context
 ├── Libraries/
-│   └── AppLogger.php         # Static facade for structured JSON logging
+│   ├── AppLogger.php         # Static facade for structured JSON logging
+│   └── FileUploader.php      # Standardized upload handler for module files
 ├── Models/
 │   ├── BaseModel.php         # Timestamps, soft delete, search/dateRange scopes
 │   └── UserModel.php         # Extends Shield's UserModel + QueryScopesTrait
@@ -217,6 +232,54 @@ Every log entry is a structured JSON line written to `writable/logs/`:
 ```
 
 > **Warning:** Never pass sensitive data (passwords, tokens, PII) in the `$context` array.
+
+---
+
+## File Uploads
+
+The kit now includes a reusable uploader service in [app/Libraries/FileUploader.php](app/Libraries/FileUploader.php) for handling module uploads consistently.
+
+It supports:
+- configurable max size and allowed extensions
+- UUID-based filenames by default
+- structured storage under writable/uploads/{module}/{year}/{month}/
+- deletion of old files when replacing uploads
+
+Example usage:
+
+```php
+$uploader = new \App\Libraries\FileUploader();
+$result = $uploader->upload($file, 'avatar');
+```
+
+---
+
+## Transformers
+
+Extend `BaseTransformer` to sanitize and shape model data before it reaches the API response layer — strip sensitive fields, rename keys, or add computed values.
+
+```php
+// app/Transformers/UserTransformer.php
+class UserTransformer extends BaseTransformer
+{
+    public function transform(array $item): array
+    {
+        return $this->only($item, ['id', 'name', 'email']) + [
+            'joined_at' => $item['created_at'] ?? null,
+        ];
+    }
+}
+```
+
+Usage in a Controller:
+
+```php
+$result = $this->userService->findAll($filters);
+$transformer = new UserTransformer();
+return $this->success($transformer->collection($result['data']));
+```
+
+Helper methods available: `only(array $data, array $keys)`, `except(array $data, array $keys)`.
 
 ---
 
