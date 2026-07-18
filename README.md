@@ -67,12 +67,15 @@ curl http://localhost:8080/api/ping
 
 ```
 Request → Filter Stack → Controller → Service → Model → Database
+                                           ↓
+                                     Transformer
 ```
 
 | Layer | Responsibility |
 |---|---|
 | **Controller** | Receives the request, delegates to the Service, returns a JSON response. Never accesses a Model directly. |
 | **Service** | Holds business logic, validates input, orchestrates Model calls. |
+| **Transformer** | Shapes and sanitizes response payloads before they reach the API response layer. |
 | **Model** | App models extend `BaseModel` (soft delete, search/dateRange scopes). Shield-based models extend `ShieldUserModel` directly. Both are compatible with `BaseService`. |
 
 ---
@@ -114,6 +117,8 @@ app/
 │   ├── AuditTrailTrait.php   # auditCreate(), auditUpdate(), auditDelete(), auditRestore()
 │   ├── LoggableTrait.php     # logInfo(), logWarning(), logError() with JSON payload
 │   └── QueryScopesTrait.php  # search(), dateRange(), active() — used by BaseModel and Shield-based models
+├── Transformers/
+│   └── BaseTransformer.php   # Abstract base for sanitizing and shaping API payloads
 └── Validation/
     └── BaseValidator.php     # Thin wrapper around CI4 Validation service
 ```

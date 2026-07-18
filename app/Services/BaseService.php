@@ -80,6 +80,12 @@ abstract class BaseService
 
         $this->auditCreate($id, $data);
 
+        try {
+            $this->afterCreate($id, $data);
+        } catch (\Throwable $e) {
+            log_message('error', '[BaseService] afterCreate hook failed: ' . $e->getMessage());
+        }
+
         return $id;
     }
 
@@ -99,6 +105,12 @@ abstract class BaseService
         }
 
         $this->auditUpdate($id, (array) $old, $data);
+
+        try {
+            $this->afterUpdate($id, $data);
+        } catch (\Throwable $e) {
+            log_message('error', '[BaseService] afterUpdate hook failed: ' . $e->getMessage());
+        }
 
         return true;
     }
@@ -120,6 +132,12 @@ abstract class BaseService
 
         $this->auditDelete($id, (array) $old);
 
+        try {
+            $this->afterDelete($id, (array) $old);
+        } catch (\Throwable $e) {
+            log_message('error', '[BaseService] afterDelete hook failed: ' . $e->getMessage());
+        }
+
         return true;
     }
 
@@ -132,5 +150,17 @@ abstract class BaseService
         }
 
         return true;
+    }
+
+    protected function afterCreate(int|string $id, array $data): void
+    {
+    }
+
+    protected function afterUpdate(int|string $id, array $data): void
+    {
+    }
+
+    protected function afterDelete(int|string $id, array $oldData): void
+    {
     }
 }
