@@ -60,22 +60,30 @@ trait AuditTrailTrait
 
     private function writeAudit(string $action, int|string $recordId, ?array $oldValues, ?array $newValues): void
     {
-        $actor = $this->resolveActor();
-        $request = Services::request();
+        try {
+            $actor = $this->resolveActor();
+            $request = Services::request();
 
-        $payload = [
-            'user_id' => $actor['id'],
-            'user_type' => $actor['type'],
-            'action' => $action,
-            'model' => $this->modelClass ?? 'unknown',
-            'record_id' => (string) $recordId,
-            'old_values' => $oldValues ? json_encode($oldValues) : null,
-            'new_values' => $newValues ? json_encode($newValues) : null,
-            'ip_address' => $request->getIPAddress(),
-            'user_agent' => $request->getUserAgent()->getAgentString(),
-            'created_at' => date('Y-m-d H:i:s'),
-        ];
+            $payload = [
+                'user_id' => $actor['id'],
+                'user_type' => $actor['type'],
+                'action' => $action,
+                'model' => $this->modelClass ?? 'unknown',
+                'record_id' => (string) $recordId,
+                'old_values' => $oldValues ? json_encode($oldValues) : null,
+                'new_values' => $newValues ? json_encode($newValues) : null,
+                'ip_address' => $request->getIPAddress(),
+                'user_agent' => $request->getUserAgent()->getAgentString(),
+                'created_at' => date('Y-m-d H:i:s'),
+            ];
 
-        (new AuditLogModel())->insert($payload);
+            (new AuditLogModel())->insert($payload);
+        } catch (\Throwable $e) {
+            log_message('error', '[AuditTrail] Failed to write audit log: ' . $e->getMessage(), [
+                'action' => $action,
+                'model' => $this->modelClass ?? 'unknown',
+                'record_id' => (string) $recordId,
+            ]);
+        }
     }
 }
