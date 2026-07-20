@@ -22,6 +22,9 @@ function dataTable(endpoint) {
     search:      '',
 
     async init() {
+      this.$watch('search', () => {
+        this.currentPage = 1
+      })
       await this.fetch()
     },
 
@@ -31,13 +34,16 @@ function dataTable(endpoint) {
         const params = new URLSearchParams({
           page:   this.currentPage,
           search: this.search,
+          per_page: 10,
         })
         const res      = await api.get(`${endpoint}?${params}`)
-        this.data      = Array.isArray(res) ? res : (res.data ?? [])
+        this.data      = res.data ?? []
         this.meta      = res.meta ?? {}
         this.totalPages = res.meta?.total_pages ?? 1
       } catch (err) {
         errorHandler.catch(err)
+        this.data = []
+        this.meta = {}
       } finally {
         this.loading = false
       }

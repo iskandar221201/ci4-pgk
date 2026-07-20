@@ -8,7 +8,7 @@
  * - 401 → auth.logout() → redirect /login
  * - 422 → throw { errors } → caught by formHandler per-field
  * - !json.status (4xx/5xx) → errorHandler.catch() + throw { message }
- * - Success → return json.data
+ * - Success → return json (full envelope)
  */
 const api = {
   async request(method, url, body = null) {
@@ -53,7 +53,7 @@ const api = {
       throw { message: json.message }
     }
 
-    return json.data
+    return json
   },
 
   get(url) {

@@ -26,7 +26,7 @@ abstract class BaseService
         $this->validator = new BaseValidator();
     }
 
-    public function findAll(array $filters = [], int $perPage = 0): array
+    public function findAll(array $filters = [], int $perPage = AppConstants::DEFAULT_PER_PAGE): array
     {
         $search  = $filters['search'] ?? null;
         $perPage = (int) ($filters['per_page'] ?? $perPage);
@@ -53,6 +53,10 @@ abstract class BaseService
         if ($perPage > 0) {
             $perPage = min($perPage, AppConstants::MAX_PER_PAGE);
             $data    = $this->model->paginate($perPage);
+
+            $lastQuery = $this->model->builder()->db()->getLastQuery();
+            log_message('error', '[BaseService::findAll] SQL: ' . $lastQuery->getOriginalQuery());
+            log_message('error', '[BaseService::findAll] Search keyword: ' . ($search ?? '(none)'));
 
             return [
                 'data'  => $data ?? [],   // FIX: paginate() returns null on empty result
