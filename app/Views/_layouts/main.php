@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= esc($title ?? 'App') ?></title>
+  <title><?= esc(($title ?? '') ? $title . ' — ' . env('APP_NAME', 'CI4 Kit') : env('APP_NAME', 'CI4 Kit')) ?></title>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>

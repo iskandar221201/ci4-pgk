@@ -15,7 +15,7 @@
     <!-- Loading skeleton -->
     <div x-show="loading" class="space-y-3 mt-4">
         <?php for ($i = 0; $i < 5; $i++): ?>
-            <div class="h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div class="h-10 bg-gray-100 rounded-lg animate-pulse"></div>
         <?php endfor ?>
     </div>
 
@@ -40,7 +40,7 @@
                         <td class="px-4 py-3 text-gray-700 whitespace-nowrap" x-text="user.username || '-'"></td>
                         <td class="px-4 py-3 text-gray-700 whitespace-nowrap" x-text="user.email || '-'"></td>
                         <td class="px-4 py-3 whitespace-nowrap">
-                            <a :href="'/users/' + user.id" class="text-blue-600 hover:text-blue-800 focus:outline-none">Detail</a>
+                            <a :href="'/users/' + user.id" class="text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900">Detail</a>
                         </td>
                     </tr>
                 </template>
@@ -49,13 +49,15 @@
     </div>
 
     <!-- Pagination -->
-    <div x-show="!loading && data.length > 0" class="flex items-center justify-between mt-4 text-sm text-gray-600" style="display: none;">
+    <div x-show="!loading && data.length > 0" class="flex items-center justify-between mt-4 text-sm text-gray-500" style="display: none;">
         <span>Halaman <span x-text="currentPage"></span> dari <span x-text="totalPages"></span></span>
         <div class="flex items-center gap-2">
-            <button type="button" @click="changePage(currentPage - 1)" :disabled="currentPage <= 1" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button type="button" @click="changePage(currentPage - 1)" :disabled="currentPage <= 1"
+                class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none">
                 &larr; Sebelumnya
             </button>
-            <button type="button" @click="changePage(currentPage + 1)" :disabled="currentPage >= totalPages" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button type="button" @click="changePage(currentPage + 1)" :disabled="currentPage >= totalPages"
+                class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none">
                 Berikutnya &rarr;
             </button>
         </div>

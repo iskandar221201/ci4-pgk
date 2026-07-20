@@ -36,7 +36,7 @@
               <li>
                 <?php if (! empty($crumb['url'])): ?>
                   <a href="<?= esc($crumb['url']) ?>"
-                     class="hover:text-blue-600 hover:underline transition-colors">
+                     class="hover:text-gray-900 hover:underline underline-offset-2 transition-colors">
                     <?= esc($crumb['label'] ?? '') ?>
                   </a>
                 <?php else: ?>
@@ -55,7 +55,7 @@
     <!-- Optional action button -->
     <?php if (! empty($action)): ?>
       <a href="<?= esc($action['url'] ?? '#') ?>"
-         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex-shrink-0">
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 focus:outline-none transition-colors flex-shrink-0">
         <!-- Plus icon -->
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

@@ -80,7 +80,7 @@ $columns = $columns ?? [];
     <button type="button"
             @click="changePage(currentPage - 1)"
             :disabled="currentPage <= 1"
-            class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none"
             aria-label="Previous page">
       &larr; Sebelumnya
     </button>
@@ -88,7 +88,7 @@ $columns = $columns ?? [];
     <button type="button"
             @click="changePage(currentPage + 1)"
             :disabled="currentPage >= totalPages"
-            class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none"
             aria-label="Next page">
       Berikutnya &rarr;
     </button>

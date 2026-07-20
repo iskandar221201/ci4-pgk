@@ -28,7 +28,7 @@
     x-model="search"
     @input.debounce.400ms="fetch()"
     placeholder="<?= esc($placeholder ?? 'Cari...') ?>"
-    class="block w-full pl-9 pr-4 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+    class="block w-full pl-9 pr-4 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
   >
 
 </div>

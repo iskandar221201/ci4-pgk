@@ -22,7 +22,7 @@
      :class="{
        'bg-red-600':    type === 'error',
        'bg-yellow-500': type === 'warning',
-       'bg-blue-600':   type === 'info'
+       'bg-gray-800':   type === 'info'
      }"
      class="fixed bottom-4 right-4 z-50 flex items-center gap-3 text-white px-4 py-3 rounded-lg shadow-lg max-w-sm w-full"
      role="alert"

@@ -1,11 +1,16 @@
 <?= $this->extend('_layouts/auth') ?>
 
 <?= $this->section('content') ?>
-<div class="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-    <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow dark:bg-gray-800">
-        <h2 class="text-2xl font-bold text-center text-gray-900 dark:text-white">Login</h2>
-        
-        <form 
+<div class="flex items-center justify-center min-h-screen bg-white">
+    <div class="w-full max-w-sm px-8 py-10">
+
+        <!-- Logo / App Name -->
+        <div class="mb-8 text-center">
+            <h1 class="text-2xl font-semibold text-gray-900 tracking-tight"><?= esc(env('APP_NAME', 'CI4 Kit')) ?></h1>
+            <p class="mt-1 text-sm text-gray-500">Masuk ke akun Anda</p>
+        </div>
+
+        <form
             x-data="{
                 ...formHandler('/api/auth/login', 'POST'),
                 email: '',
@@ -31,51 +36,59 @@
                         this.isSubmitting = false;
                     }
                 }
-            }" 
+            }"
             @submit.prevent="doLogin()"
-            class="space-y-4"
+            class="space-y-5"
         >
-            <!-- Email Field -->
-            <div>
-                <label for="email" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Email</label>
-                <input 
-                    type="email" 
-                    id="email" 
-                    x-model="email"
-                    :class="{ 'border-red-500 focus:ring-red-500 focus:border-red-500': errors.email }"
-                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" 
-                    required
-                >
-                <span x-show="errors.email" x-text="errors.email" class="text-sm text-red-600 dark:text-red-500 mt-1 block"></span>
-            </div>
-            
-            <!-- Password Field -->
-            <div>
-                <label for="password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Password</label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    x-model="password"
-                    :class="{ 'border-red-500 focus:ring-red-500 focus:border-red-500': errors.password }"
-                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" 
-                    required
-                >
-                <span x-show="errors.password" x-text="errors.password" class="text-sm text-red-600 dark:text-red-500 mt-1 block"></span>
-            </div>
-            
             <!-- General Error -->
-            <div x-show="generalError" x-text="generalError" class="p-3 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-900 dark:text-red-300"></div>
+            <div
+                x-show="generalError"
+                x-text="generalError"
+                x-cloak
+                class="px-4 py-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg"
+            ></div>
 
-            <!-- Submit Button -->
-            <button 
-                type="submit" 
+            <!-- Email -->
+            <div>
+                <label for="email" class="block mb-1.5 text-sm font-medium text-gray-700">Email</label>
+                <input
+                    type="email"
+                    id="email"
+                    x-model="email"
+                    placeholder="nama@email.com"
+                    :class="errors.email ? 'border-red-400 focus:ring-red-400 focus:border-red-400' : 'border-gray-300 focus:ring-gray-400 focus:border-gray-400'"
+                    class="w-full px-3.5 py-2.5 text-sm text-gray-900 bg-white border rounded-lg outline-none focus:ring-1 transition placeholder-gray-400"
+                    required
+                >
+                <span x-show="errors.email" x-text="errors.email" class="mt-1 text-xs text-red-600 block"></span>
+            </div>
+
+            <!-- Password -->
+            <div>
+                <label for="password" class="block mb-1.5 text-sm font-medium text-gray-700">Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    x-model="password"
+                    placeholder="••••••••"
+                    :class="errors.password ? 'border-red-400 focus:ring-red-400 focus:border-red-400' : 'border-gray-300 focus:ring-gray-400 focus:border-gray-400'"
+                    class="w-full px-3.5 py-2.5 text-sm text-gray-900 bg-white border rounded-lg outline-none focus:ring-1 transition placeholder-gray-400"
+                    required
+                >
+                <span x-show="errors.password" x-text="errors.password" class="mt-1 text-xs text-red-600 block"></span>
+            </div>
+
+            <!-- Submit -->
+            <button
+                type="submit"
                 :disabled="isSubmitting"
-                class="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full py-2.5 text-sm font-medium text-white bg-gray-900 hover:bg-gray-700 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                <span x-show="isSubmitting">Loading...</span>
-                <span x-show="!isSubmitting">Login</span>
+                <span x-show="isSubmitting">Memproses...</span>
+                <span x-show="!isSubmitting">Masuk</span>
             </button>
         </form>
+
     </div>
 </div>
 <?= $this->endSection() ?>

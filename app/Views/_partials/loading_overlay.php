@@ -25,7 +25,7 @@
 
   <!-- Spinner -->
   <div class="flex flex-col items-center gap-3">
-    <svg class="w-10 h-10 text-blue-600 animate-spin"
+    <svg class="w-10 h-10 text-gray-900 animate-spin"
          fill="none"
          viewBox="0 0 24 24"
          aria-hidden="true">
