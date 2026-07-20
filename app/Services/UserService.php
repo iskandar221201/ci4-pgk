@@ -70,6 +70,12 @@ class UserService extends BaseService
             throw new ServiceException('Failed to create user record', AppConstants::HTTP_SERVER_ERROR);
         }
 
+        // Aktifkan user langsung — admin yang membuat akun tidak perlu verifikasi email
+        $createdUser = $userModel->findById($id);
+        if ($createdUser !== null) {
+            $userModel->activate($createdUser);
+        }
+
         return $id;
     }
 

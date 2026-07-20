@@ -9,6 +9,16 @@ use CodeIgniter\Router\RouteCollection;
 // =========================================================
 $routes->get('/', 'Home::index');
 
+// =========================================================
+// Web Routes (CI4 Kit v3.0)
+// =========================================================
+$routes->group('', static function ($routes) {
+    $routes->get('login',           'Web\UserWebController::loginPage');
+    $routes->get('users',           'Web\UserWebController::index');
+    $routes->get('users/create',    'Web\UserWebController::create');
+    $routes->get('users/(:num)',    'Web\UserWebController::detail/$1');
+});
+
 // ⚠️  PLACEHOLDER — AuthController does not exist in this kit yet.
 //     This route will throw PageNotFoundException if hit in production.
 //     Remove this line or create app/Controllers/AuthController.php before deploying.
@@ -18,7 +28,11 @@ $routes->post('login', 'AuthController::login');
 // =========================================================
 // API Routes — Public (no auth required)
 // =========================================================
-$routes->get('api/ping', 'Api\PingController::index');
+$routes->group('api', static function ($routes) {
+    $routes->get('ping', 'Api\PingController::index');
+    $routes->post('auth/login', 'Api\AuthController::login');
+});
+
 
 // =========================================================
 // API Routes — Protected (apiKeyFilter)
@@ -35,15 +49,13 @@ $routes->group('api', ['filter' => 'apiKeyFilter'], static function (RouteCollec
     $routes->delete('users/(:num)', 'Api\UserController::delete/$1');
 });
 
-// =========================================================
-// Web Routes — Protected (authFilter)
-// =========================================================
-// ⚠️  PLACEHOLDER — DashboardController does not exist in this kit yet.
-//     This route will throw PageNotFoundException if hit in production.
-//     Remove this line or create app/Controllers/DashboardController.php before deploying.
-$routes->group('', ['filter' => 'authFilter'], static function (RouteCollection $routes): void {
-    $routes->get('dashboard', 'DashboardController::index');
+$routes->group('', static function ($routes) {
+    // ⚠️ Auth checking for web routes should be handled by auth.js checking localStorage on frontend,
+    // or by custom web auth filter if using session auth. Since CI4 Kit v3 uses token auth,
+    // the views layer is public and auth redirect is handled by JS.
+    $routes->get('dashboard', 'Web\DashboardController::index');
 });
+
 
 // Shield auth routes (login, register, magic-link, etc.)
 service('auth')->routes($routes);
