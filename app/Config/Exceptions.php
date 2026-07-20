@@ -149,7 +149,8 @@ class Exceptions extends BaseConfig
             }
 
             $response->send();
-            exit;
+
+            return new \App\Libraries\VoidExceptionHandler();
         }
 
         return new ExceptionHandler($this);

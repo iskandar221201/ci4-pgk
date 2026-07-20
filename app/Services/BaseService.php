@@ -55,8 +55,8 @@ abstract class BaseService
             $data    = $this->model->paginate($perPage);
 
             $lastQuery = $this->model->builder()->db()->getLastQuery();
-            log_message('error', '[BaseService::findAll] SQL: ' . $lastQuery->getOriginalQuery());
-            log_message('error', '[BaseService::findAll] Search keyword: ' . ($search ?? '(none)'));
+            log_message('debug', '[BaseService::findAll] SQL: ' . $lastQuery->getOriginalQuery());
+            log_message('debug', '[BaseService::findAll] Search keyword: ' . ($search ?? '(none)'));
 
             return [
                 'data'  => $data ?? [],   // FIX: paginate() returns null on empty result
@@ -65,7 +65,7 @@ abstract class BaseService
         }
 
         return [
-            'data' => $this->model->findAll(),
+            'data' => $this->model->findAll(AppConstants::MAX_PER_PAGE),
         ];
     }
 
@@ -93,7 +93,7 @@ abstract class BaseService
         return $id;
     }
 
-    public function update(int|string $id, array $data): bool
+    public function update(int|string $id, array $data): mixed
     {
         // FIX: check existence first so no-op updates don't false-404
         $old = $this->model->find($id);
@@ -116,7 +116,7 @@ abstract class BaseService
             log_message('error', '[BaseService] afterUpdate hook failed: ' . $e->getMessage());
         }
 
-        return true;
+        return $this->model->find($id);
     }
 
     public function delete(int|string $id): bool

@@ -98,7 +98,7 @@ class UserService extends BaseService
      * @throws ServiceException    if there are no valid fields to update,
      *                             or if the DB update fails.
      */
-    public function updateUser(int|string $id, array $data): bool
+    public function updateUser(int|string $id, array $data): mixed
     {
         $rules = [];
 

@@ -92,12 +92,12 @@ class FileUploader
             : $file->getName();
 
         $relativePath = 'uploads/' . $relativeDir . $filename;
-        $content = file_get_contents($file->getTempName());
-        if ($content === false) {
-            throw new \RuntimeException('Failed to read uploaded file contents.');
+        $directory = $this->config['base_path'] . str_replace('/', DIRECTORY_SEPARATOR, $relativeDir);
+        if (! is_dir($directory) && ! @mkdir($directory, 0777, true) && ! is_dir($directory)) {
+            throw new \RuntimeException('Failed to create destination directory: ' . $directory);
         }
 
-        $this->driver->put($relativePath, $content);
+        $file->move($directory, $filename);
 
         return [
             'path'      => $relativePath,

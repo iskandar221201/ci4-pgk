@@ -117,15 +117,8 @@ class UserController extends BaseApiController
     public function update(int $id): ResponseInterface
     {
         try {
-            $user = $this->userService->findById($id);
-
-            if ($user === null) {
-                return $this->error('User not found', 404);
-            }
-
             $data = $this->request->getJSON(true) ?? [];
-            $this->userService->updateUser($id, $data);
-            $updated = $this->userService->findById($id);
+            $updated = $this->userService->updateUser($id, $data);
 
             return $this->success($this->sanitizeUser($updated), 'User updated');
         } catch (ValidationException $e) {

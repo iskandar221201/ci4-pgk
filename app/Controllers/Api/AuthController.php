@@ -60,7 +60,6 @@ class AuthController extends BaseApiController
         }
 
         // Fallback: Generate Shield Access Token
-        $user->revokeAllAccessTokens();
         $token = $user->generateAccessToken('api-login');
 
         return $this->success([

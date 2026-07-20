@@ -113,6 +113,8 @@ protected function afterDelete(int|string $id, array $oldData): void
 
 Hook failures are non-blocking — they log to `log_message()` and never break the main operation.
 
+> Note: `BaseService::update()` now returns the updated entity instead of `true`. Controllers receive the fresh record directly without a second database query.
+
 ---
 
 ## Project Structure
@@ -120,7 +122,7 @@ Hook failures are non-blocking — they log to `log_message()` and never break t
 ```
 app/
 ├── Config/
-│   ├── AppConstants.php      # HTTP status codes and app-wide constants
+│       ├── AppConstants.php      # HTTP status codes, pagination caps, and app-wide constants
 │   ├── Filters.php           # Filter aliases and route bindings
 │   ├── Routes.php            # Route definitions (web + API)
 │   └── SSOConfig.php         # SSO toggle + RSA key config (v2.0)
@@ -148,10 +150,11 @@ app/
 ├── Contracts/
 │   └── StorageDriverInterface.php  # Abstraction for pluggable storage backends
 ├── Libraries/
-│   ├── AppLogger.php         # Static facade for structured JSON logging
-│   ├── BasePdfExporter.php   # Abstract base for PDF export via mPDF (v2.0)
-│   ├── FileUploader.php      # Standardized upload handler for module files
-│   ├── JWTService.php        # JWT RS256 sign and verify (v2.0)
+│   ├── AppLogger.php              # Static facade for structured JSON logging
+│   ├── BasePdfExporter.php        # Abstract base for PDF export via mPDF (v2.0)
+│   ├── FileUploader.php           # Standardized upload handler for module files
+│   ├── JWTService.php             # JWT RS256 sign and verify (v2.0)
+│   ├── VoidExceptionHandler.php   # Prevents double-response on API error routes
 │   └── Storage/
 │       ├── LocalDriver.php   # Default local filesystem storage driver
 │       └── S3Driver.php      # Optional S3-compatible storage driver
@@ -305,6 +308,7 @@ Credential validation flow:
 2. `service('passwords')->verify(...)` — bcrypt comparison, no session side-effect
 3. `user->active` check — reject inactive accounts with `403`
 4. `generateAccessToken('api-login')` — issue Shield access token
+   - Previous tokens from other devices are **not revoked** — users stay logged in across devices
 
 After login, `auth.js` stores the token and username in `localStorage`:
 
@@ -466,6 +470,7 @@ It supports:
 - structured storage under `writable/uploads/{module}/{year}/{month}/`
 - pluggable storage drivers with Local as the default and optional S3-compatible support
 - deletion of old files when replacing uploads
+- **streaming upload via `$file->move()`** — files are moved directly from temp to target directory, never loaded into memory. A 100MB file uses ~0 extra PHP memory.
 
 Example usage:
 
@@ -484,6 +489,8 @@ $uploader = new \App\Libraries\FileUploader([], new \App\Libraries\Storage\S3Dri
     'secret' => env('S3_SECRET'),
 ]));
 ```
+
+> S3 uploads are retried up to 3 times with exponential backoff (100ms/200ms/400ms) on transient failures. CURL errors and HTTP 5xx are retried; 4xx are not.
 
 ---
 
@@ -532,7 +539,8 @@ Each audit log entry stores:
 
 ### Files involved
 
-- [app/Database/Migrations/20260718120000_CreateAuditLogsTable.php](app/Database/Migrations/20260718120000_CreateAuditLogsTable.php)
+- [app/Database/Migrations/20260718120000_CreateAuditLogsTable.php](app/Database/Migrations/20260718120000_CreateAuditLogsTable.php) — includes composite index on `(model, action, created_at)` for common query patterns
+- [app/Database/Migrations/20260720100000_AddAuthIdentitiesIndex.php](app/Database/Migrations/20260720100000_AddAuthIdentitiesIndex.php) — adds index on `auth_identities.secret` for email search
 - [app/Models/AuditLogModel.php](app/Models/AuditLogModel.php)
 - [app/Traits/AuditTrailTrait.php](app/Traits/AuditTrailTrait.php)
 - [app/Services/BaseService.php](app/Services/BaseService.php)

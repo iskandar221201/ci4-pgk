@@ -34,27 +34,27 @@ class S3Driver implements StorageDriverInterface
         $url = $this->buildUrl($relativePath);
         $headers = $this->sign('PUT', $url, $content, ['content-type' => 'application/octet-stream']);
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $content);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        $result = $this->retryRequest(function () use ($url, $content, $headers): array {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $content);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
-        $response = curl_exec($ch);
-        $error = curl_error($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+            $response = curl_exec($ch);
+            $error = curl_error($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
 
-        if ($response === false || $error !== '') {
-            throw new \RuntimeException('S3 upload failed: ' . ($error !== '' ? $error : 'curl request failed'));
-        }
+            return ['response' => $response, 'error' => $error, 'status' => $status];
+        }, 'S3 upload failed');
 
-        if ($status >= 200 && $status < 300) {
+        if ($result['status'] >= 200 && $result['status'] < 300) {
             return true;
         }
 
-        throw new \RuntimeException('S3 upload failed with HTTP ' . $status);
+        throw new \RuntimeException('S3 upload failed with HTTP ' . $result['status']);
     }
 
     public function delete(string $relativePath): bool
@@ -62,26 +62,26 @@ class S3Driver implements StorageDriverInterface
         $url = $this->buildUrl($relativePath);
         $headers = $this->sign('DELETE', $url, '', []);
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        $result = $this->retryRequest(function () use ($url, $headers): array {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
-        $response = curl_exec($ch);
-        $error = curl_error($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+            $response = curl_exec($ch);
+            $error = curl_error($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
 
-        if ($response === false || $error !== '') {
-            throw new \RuntimeException('S3 delete failed: ' . ($error !== '' ? $error : 'curl request failed'));
-        }
+            return ['response' => $response, 'error' => $error, 'status' => $status];
+        }, 'S3 delete failed');
 
-        if ($status === 204 || $status === 404) {
+        if ($result['status'] === 204 || $result['status'] === 404) {
             return true;
         }
 
-        log_message('error', '[S3Driver] Delete failed with HTTP ' . $status . ' for path: ' . $relativePath);
+        log_message('error', '[S3Driver] Delete failed with HTTP ' . $result['status'] . ' for path: ' . $relativePath);
         return false;
     }
 
@@ -122,6 +122,46 @@ class S3Driver implements StorageDriverInterface
         }
 
         return implode('/', $encodedSegments);
+    }
+
+    /**
+     * @param callable(): array{response: string|false, error: string, status: int} $callback
+     * @return array{response: string|false, error: string, status: int}
+     */
+    private function retryRequest(callable $callback, string $errorPrefix): array
+    {
+        $maxAttempts = 3;
+        $delayMs = 100;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $result = $callback();
+
+            $isTransient = ($result['response'] === false || $result['error'] !== '')
+                || ($result['status'] >= 500 && $result['status'] < 600);
+
+            if (!$isTransient) {
+                return $result;
+            }
+
+            if ($attempt < $maxAttempts) {
+                log_message('warning', sprintf(
+                    '[S3Driver] %s (attempt %d/%d): retrying in %dms',
+                    $errorPrefix,
+                    $attempt,
+                    $maxAttempts,
+                    $delayMs,
+                ));
+
+                usleep($delayMs * 1000);
+                $delayMs *= 2;
+            }
+        }
+
+        if ($result['error'] !== '') {
+            throw new \RuntimeException($errorPrefix . ': ' . $result['error']);
+        }
+
+        return $result;
     }
 
     private function sign(string $method, string $url, string $body, array $headers): array
