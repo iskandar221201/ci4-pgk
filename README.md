@@ -4,6 +4,7 @@
 ![Shield](https://img.shields.io/badge/Shield-Auth-22c55e?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 ![Status](https://img.shields.io/badge/status-stable-brightgreen?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)
 
 A production-ready CodeIgniter 4 starter kit with structured API responses, Shield authentication, layered filter stack, service layer architecture, and structured JSON logging — ready to clone and extend.
 
@@ -21,6 +22,9 @@ A production-ready CodeIgniter 4 starter kit with structured API responses, Shie
 - [File Uploads](#file-uploads)
 - [Transformers](#transformers)
 - [Audit Trail](#audit-trail)
+- [SSO Layer](#sso-layer)
+- [PDF Export](#pdf-export)
+- [Compatibility Matrix](#compatibility-matrix)
 - [How to Add a New Resource](#how-to-add-a-new-resource)
 - [Server Requirements](#server-requirements)
 
@@ -80,6 +84,13 @@ Request → Filter Stack → Controller → Service → Model → Database
 | **Transformer** | Shapes and sanitizes response payloads before they reach the API response layer. |
 | **Model** | App models extend `BaseModel` (soft delete, search/dateRange scopes). Shield-based models extend `ShieldUserModel` directly. Both are compatible with `BaseService`. |
 
+### Optional Layers (v2.0)
+
+| Layer | Files | Notes |
+|---|---|---|
+| **SSO Layer** | `SSOConfig`, `JWTService`, `SSOFilter` | JWT RS256 auth for cross-app requests. Disabled by default (`SSO_ENABLED=false`). |
+| **PDF Export** | `BasePdfExporter` | Abstract base for mPDF-based PDF generation. Extend per module. |
+
 ### Lifecycle Hooks
 
 Override any of these in your Service to react to CRUD events without touching `BaseService`:
@@ -101,7 +112,8 @@ app/
 ├── Config/
 │   ├── AppConstants.php      # HTTP status codes and app-wide constants
 │   ├── Filters.php           # Filter aliases and route bindings
-│   └── Routes.php            # Route definitions
+│   ├── Routes.php            # Route definitions
+│   └── SSOConfig.php         # SSO toggle + RSA key config (v2.0)
 ├── Controllers/
 │   ├── BaseController.php    # Base for all controllers (traits wired here)
 │   └── Api/
@@ -115,14 +127,17 @@ app/
 │   ├── ApiKeyFilter.php      # Validates Bearer token via Shield AccessTokens
 │   ├── AuthFilter.php        # Session auth guard for web routes
 │   ├── CorsFilter.php        # CORS headers + OPTIONS preflight
-│   └── JsonBodyFilter.php    # Rejects non-JSON bodies on POST/PUT/PATCH
+│   ├── JsonBodyFilter.php    # Rejects non-JSON bodies on POST/PUT/PATCH
+│   └── SSOFilter.php         # JWT Bearer token verification for SSO (v2.0)
 ├── Helpers/
 │   └── response_helper.php   # api_success() / api_error() for filter context
 ├── Contracts/
 │   └── StorageDriverInterface.php  # Abstraction for pluggable storage backends
 ├── Libraries/
 │   ├── AppLogger.php         # Static facade for structured JSON logging
+│   ├── BasePdfExporter.php   # Abstract base for PDF export via mPDF (v2.0)
 │   ├── FileUploader.php      # Standardized upload handler for module files
+│   ├── JWTService.php        # JWT RS256 sign and verify (v2.0)
 │   └── Storage/
 │       ├── LocalDriver.php   # Default local filesystem storage driver
 │       └── S3Driver.php      # Optional S3-compatible storage driver
@@ -139,9 +154,13 @@ app/
 │   └── QueryScopesTrait.php  # search(), dateRange(), active() — used by BaseModel and Shield-based models
 ├── Transformers/
 │   └── BaseTransformer.php   # Abstract base for sanitizing and shaping API payloads
-└── Validation/
-    └── BaseValidator.php     # Thin wrapper around CI4 Validation service
+├── Validation/
+│   └── BaseValidator.php     # Thin wrapper around CI4 Validation service
+└── Views/
+    └── exports/              # PDF export templates — plain HTML, no layout (v2.0)
 ```
+
+> Files marked `(v2.0)` are additive. Projects using v1.x are unaffected.
 
 ---
 
@@ -190,7 +209,7 @@ All responses follow a consistent JSON structure:
 ## Filter Stack
 
 ```
-Request → CorsFilter → JsonBodyFilter → ApiKeyFilter / AuthFilter → Controller
+Request → CorsFilter → JsonBodyFilter → ApiKeyFilter / SSOFilter / AuthFilter → Controller
 ```
 
 | Filter | Applied To | Purpose |
@@ -198,6 +217,7 @@ Request → CorsFilter → JsonBodyFilter → ApiKeyFilter / AuthFilter → Cont
 | `CorsFilter` | `api/*` (before + after) | Injects CORS headers; handles OPTIONS preflight with `204` |
 | `JsonBodyFilter` | `api/*` (before) | Rejects POST/PUT/PATCH without `Content-Type: application/json` |
 | `ApiKeyFilter` | `api/*` protected group | Validates Bearer token via Shield AccessTokens |
+| `SSOFilter` | `api/*` protected group (opt-in) | Verifies JWT Bearer token via RS256. Pass-through when `SSO_ENABLED=false`. |
 | `AuthFilter` | web routes | Checks session login; redirects to `/login` if missing |
 
 Filter registration: `app/Config/Filters.php`
@@ -335,6 +355,244 @@ php spark migrate
 
 ---
 
+## SSO Layer
+
+The kit includes an optional JWT RS256-based Single Sign-On layer for cross-application authentication. It is **disabled by default** — set `SSO_ENABLED=true` to activate.
+
+### How it works
+
+```
+SSO Server                    Resource Server
+──────────────                ──────────────────────────────
+POST /api/login               Authorization: Bearer <JWT>
+    ↓                                  ↓
+JWTService::sign()            SSOFilter::before()
+    ↓                                  ↓
+JWT (RS256) → client          JWTService::verify() — offline, no HTTP call
+                                       ↓
+                              Valid → $request->ssoUser injected
+                              Invalid → 401 Unauthorized
+```
+
+### Setup
+
+**1. Generate an RSA key pair** (run once on the SSO Server):
+
+```bash
+openssl genrsa -out private.pem 2048
+openssl rsa -in private.pem -pubout -out public.pem
+```
+
+- `private.pem` — stays on the SSO Server only. Never committed to version control.
+- `public.pem` — distributed to all Resource Server apps via `.env`.
+
+**2. Configure `.env`**
+
+On the **SSO Server** (signs tokens):
+
+```
+SSO_ENABLED=true
+SSO_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n<key>\n-----END RSA PRIVATE KEY-----"
+SSO_TOKEN_TTL=3600
+```
+
+On each **Resource Server** (verifies tokens):
+
+```
+SSO_ENABLED=true
+SSO_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n<key>\n-----END PUBLIC KEY-----"
+```
+
+**3. Apply the filter to routes**
+
+```php
+$routes->group('api', ['filter' => 'ssoFilter'], static function ($routes) {
+    $routes->get('profile', 'Api\ProfileController::index');
+});
+```
+
+`ssoFilter` and `apiKeyFilter` can be used on different route groups in the same app.
+
+### Issue a token (SSO Server)
+
+```php
+// app/Controllers/Api/AuthController.php
+public function login(): ResponseInterface
+{
+    // 1. Validate credentials (via Shield or custom logic)
+    // 2. Sign JWT
+    $token = (new \App\Libraries\JWTService())->sign([
+        'sub'   => (string) $user->id,
+        'email' => $user->email,
+    ]);
+
+    return $this->success(['token' => $token]);
+}
+```
+
+### Access the payload (Resource Server)
+
+```php
+// In any controller on a ssoFilter-protected route
+$ssoUser = $this->request->ssoUser; // array: ['sub' => '1', 'email' => '...', 'iat' => ..., 'exp' => ...]
+```
+
+### Install
+
+```bash
+composer require firebase/php-jwt:^7.0
+```
+
+> `firebase/php-jwt` is already in `require` since v2.0. No extra install needed if you cloned this kit.
+
+### Notes
+
+- The `sub` claim is required in every token. `JWTService::sign()` will throw if absent.
+- Default TTL is 3600 seconds (1 hour). Override via `SSO_TOKEN_TTL`.
+- When `SSO_ENABLED=false`, `SSOFilter` is a complete pass-through — zero overhead.
+- Refresh tokens are not included in v2.0. Implement in your own app if needed.
+
+---
+
+## PDF Export
+
+The kit includes `BasePdfExporter`, an abstract base class for generating and streaming PDFs via [mPDF](https://mpdf.github.io/). It is **optional** — install mPDF only when your project needs PDF export.
+
+### Install
+
+```bash
+composer require mpdf/mpdf:^8.2
+```
+
+### Create an exporter
+
+One subclass per resource — do not create one exporter for all modules.
+
+```php
+// app/Libraries/UserPdfExporter.php
+namespace App\Libraries;
+
+class UserPdfExporter extends BasePdfExporter
+{
+    protected function buildHtml(array $data): string
+    {
+        return view('exports/users_pdf', ['users' => $data], ['saveData' => true]);
+    }
+}
+```
+
+For landscape or custom paper size, override the properties:
+
+```php
+class ReportPdfExporter extends BasePdfExporter
+{
+    protected string $orientation = 'L'; // Landscape
+    protected string $paperSize   = 'A3';
+}
+```
+
+For advanced layouts (letterhead, watermark, custom fonts), override `__construct()` — always call `parent::__construct()` first.
+
+### Use in a controller
+
+```php
+public function exportPdf(): ResponseInterface
+{
+    $data = (new UserService())->findAll([])['data'];
+
+    try {
+        (new UserPdfExporter())->export($data, 'users-' . date('Ymd') . '.pdf');
+        exit; // PDF streams directly — bypass CI4 response pipeline
+    } catch (\RuntimeException $e) {
+        AppLogger::error('pdf.export.failed', [], $e);
+        return $this->error('Failed to generate PDF', 500);
+    }
+}
+```
+
+### Create a PDF template
+
+Templates live in `app/Views/exports/`. They are plain HTML — **never extend any layout**.
+
+```php
+// app/Views/exports/users_pdf.php
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: sans-serif; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; }
+    th { background: #f3f4f6; }
+  </style>
+</head>
+<body>
+  <h2>Users</h2>
+  <table>
+    <thead><tr><th>No</th><th>Name</th><th>Email</th></tr></thead>
+    <tbody>
+      <?php foreach ($users as $i => $user): ?>
+      <tr>
+        <td><?= $i + 1 ?></td>
+        <td><?= esc($user['name']) ?></td>
+        <td><?= esc($user['email']) ?></td>
+      </tr>
+      <?php endforeach ?>
+    </tbody>
+  </table>
+</body>
+</html>
+```
+
+> **Always use `esc()`** for user-controlled data in templates — even inside PDFs.
+
+### Notes
+
+- One exporter subclass per resource. Do not build a generic "export anything" class.
+- Templates in `app/Views/exports/` must not extend any CI4 layout — mPDF renders raw HTML.
+- mPDF supports UTF-8 and a CSS subset — sufficient for tables and standard reports.
+- For very large datasets, implement chunking in your subclass before calling `$this->pdf->WriteHTML()`.
+
+---
+
+## Compatibility Matrix
+
+v2.0 is a **strict superset** of v1.x. No migrations required.
+
+| Feature | v1.x | v2.0 |
+|---|---|---|
+| BE Layer (API, Service, Model) | ✅ | ✅ |
+| Shield Auth (session + token) | ✅ | ✅ |
+| Audit Trail | ✅ | ✅ |
+| File Upload + Storage Drivers | ✅ | ✅ |
+| Structured JSON Logging | ✅ | ✅ |
+| Transformers | ✅ | ✅ |
+| **SSO Layer (JWT RS256)** | ❌ | ✅ optional |
+| **PDF Export (mPDF)** | ❌ | ✅ optional |
+
+### Upgrading from v1.x
+
+No migration needed. Copy these files into your existing v1.x project:
+
+| File | Purpose |
+|---|---|
+| `app/Config/SSOConfig.php` | SSO configuration |
+| `app/Libraries/JWTService.php` | JWT sign / verify |
+| `app/Filters/SSOFilter.php` | SSO filter |
+| `app/Libraries/BasePdfExporter.php` | PDF export base |
+
+Then register `ssoFilter` in `app/Config/Filters.php`:
+
+```php
+'ssoFilter' => \App\Filters\SSOFilter::class,
+```
+
+Add the SSO keys to your `.env` (copy from `.env.example`).
+
+Both features are disabled / unused until you explicitly activate them.
+
+---
+
 ## How to Add a New Resource
 
 Example: adding a `Post` resource.
@@ -407,6 +665,7 @@ PHP 8.2 or higher with the following extensions:
 | `mysqlnd` | Required for MySQL |
 | `libcurl` | Required if using `HTTP\CURLRequest` |
 | `curl` | Required if using `S3Driver` |
+| `openssl` | Required for generating RSA key pairs (SSO setup, run once) |
 
 ---
 
