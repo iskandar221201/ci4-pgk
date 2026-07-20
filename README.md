@@ -4,9 +4,9 @@
 ![Shield](https://img.shields.io/badge/Shield-Auth-22c55e?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 ![Status](https://img.shields.io/badge/status-stable-brightgreen?style=flat-square)
-![Version](https://img.shields.io/badge/version-3.0.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-3.1.0-blue?style=flat-square)
 
-A production-ready CodeIgniter 4 starter kit with structured API responses, Shield authentication, layered filter stack, service layer architecture, structured JSON logging, and a clean token-based web UI layer — ready to clone and extend.
+A Production-grade CI4 starter kit — full-stack monolith or pure REST API backend. Pairs with any frontend framework. Shield auth · Service layer · Audit trail · SSO · PDF export · Resumable uploads. Clone, extend, ship in a day
 
 ---
 
