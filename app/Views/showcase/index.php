@@ -396,6 +396,15 @@ CODE; ?>
       </table>
     </div>
 
+    <div class="mt-4">
+      <p class="text-sm text-gray-500 mb-3">Loading skeleton (5 baris pulsing):</p>
+      <div class="space-y-3">
+        <?php for ($i = 0; $i < 5; $i++): ?>
+          <div class="h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+        <?php endfor ?>
+      </div>
+    </div>
+
     <?php $tableCode = <<<'CODE'
 <div x-data="dataTable('/api/users')">
     <?= $this->include('_partials/search_bar') ?>
