@@ -781,7 +781,7 @@ public function exportPdf(): ResponseInterface
 v3.0 is a **strict superset** of v2.x. No database migrations required to upgrade.
 
 | Feature | v1.x | v2.0 | v3.0 |
-|---|---|---|---|---|
+|---|---|---|---|
 | BE Layer (API, Service, Model) | ✅ | ✅ | ✅ |
 | Shield Auth (token-based) | ✅ | ✅ | ✅ |
 | Audit Trail | ✅ | ✅ | ✅ |
