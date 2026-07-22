@@ -158,13 +158,36 @@ abstract class BaseService
 
     protected function afterCreate(int|string $id, array $data): void
     {
+        $this->wsPublish('create', $id, $data);
     }
 
     protected function afterUpdate(int|string $id, array $data): void
     {
+        $this->wsPublish('update', $id, $data);
     }
 
     protected function afterDelete(int|string $id, array $oldData): void
     {
+        $this->wsPublish('delete', $id, $oldData);
+    }
+
+    private function wsPublish(string $action, int|string $id, array $data): void
+    {
+        $channel = 'model:' . strtolower(
+            str_replace(
+                'model',
+                '',
+                basename(str_replace('\\', '/', $this->modelClass))
+            )
+        );
+
+        try {
+            (new \App\Libraries\WsPublisher())->publish(
+                $channel,
+                ['action' => $action, 'id' => $id, 'data' => $data]
+            );
+        } catch (\Throwable $e) {
+            log_message('error', '[BaseService] wsPublish failed: ' . $e->getMessage());
+        }
     }
 }

@@ -4,9 +4,9 @@
 ![Shield](https://img.shields.io/badge/Shield-Auth-22c55e?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 ![Status](https://img.shields.io/badge/status-stable-brightgreen?style=flat-square)
-![Version](https://img.shields.io/badge/version-3.1.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-4.0.0-blue?style=flat-square)
 
-A Production-grade CI4 starter kit — full-stack monolith or pure REST API backend. Pairs with any frontend framework. Shield auth · Service layer · Audit trail · SSO · PDF export · Resumable uploads. Clone, extend, ship in a day
+A Production-grade CI4 starter kit — full-stack monolith or pure REST API backend. Pairs with any frontend framework. Shield auth · Service layer · Audit trail · SSO · PDF export · Resumable uploads · WebSocket. Clone, extend, ship in a day
 
 ---
 
@@ -102,6 +102,7 @@ Request → Filter Stack → Controller → Service → Model → Database
 | **SSO Layer** | `SSOConfig`, `JWTService`, `SSOFilter` | JWT RS256 auth for cross-app requests. Disabled by default (`SSO_ENABLED=false`). |
 | **PDF Export** | `BasePdfExporter` | Abstract base for mPDF-based PDF generation. Extend per module. |
 | **TUS Chunked Upload** | `TusConfig`, `TusUploader`, `TusController`, `TusCleanupCommand` | TUS protocol-based resumable uploads for large files. Requires `composer require ankitpokhrel/tus-php`. |
+| **WebSocket Server** | `WsConfig`, `WsPublisher`, `WsServer`, `WsServeCommand` | Ratchet-based real-time events. CI4 publishes via internal HTTP. Disabled by default (`WS_ENABLED=false`). |
 
 ### Lifecycle Hooks
 
@@ -128,7 +129,8 @@ app/
 │   ├── Filters.php           # Filter aliases and route bindings
 │   ├── Routes.php            # Route definitions (web + API)
 │   ├── SSOConfig.php         # SSO toggle + RSA key config (v2.0)
-│   └── TusConfig.php         # TUS upload dir, max size, expiry (v3.0)
+│   ├── TusConfig.php         # TUS upload dir, max size, expiry (v3.0)
+│   └── WsConfig.php          # WebSocket host, port, enabled, secret (v4.0)
 ├── Controllers/
 │   ├── BaseController.php    # Base for all controllers (traits wired here)
 │   ├── Api/
@@ -152,7 +154,8 @@ app/
 ├── Helpers/
 │   └── response_helper.php   # api_success() / api_error() for filter context
 ├── Commands/
-│   └── TusCleanupCommand.php  # php spark tus:cleanup — removes expired TUS uploads (v3.0)
+│   ├── TusCleanupCommand.php  # php spark tus:cleanup — removes expired TUS uploads (v3.0)
+│   └── WsServeCommand.php     # php spark ws:serve — starts Ratchet WebSocket server (v4.0)
 ├── Contracts/
 │   └── StorageDriverInterface.php  # Abstraction for pluggable storage backends
 ├── Libraries/
@@ -162,6 +165,8 @@ app/
 │   ├── JWTService.php             # JWT RS256 sign and verify (v2.0)
 │   ├── TusUploader.php            # TUS protocol server wrapper + cleanup (v3.0)
 │   ├── VoidExceptionHandler.php   # Prevents double-response on API error routes
+│   ├── WsPublisher.php            # HTTP publisher from CI4 to Ratchet server (v4.0)
+│   ├── WsServer.php               # Ratchet WebSocket server wrapper (v4.0)
 │   └── Storage/
 │       ├── LocalDriver.php   # Default local filesystem storage driver
 │       └── S3Driver.php      # Optional S3-compatible storage driver
@@ -776,25 +781,137 @@ public function exportPdf(): ResponseInterface
 
 ---
 
+## WebSocket Server (v4.0)
+
+The kit includes an optional real-time event layer powered by [Ratchet](http://socketo.me/). CI4 publishes events to a separate Ratchet process via internal HTTP; the Ratchet server broadcasts them to connected WebSocket clients. It is **disabled by default** — set `WS_ENABLED=true` to activate.
+
+### How it works
+
+```
+┌─ CI4 ──────────────────┐     POST /publish      ┌─ Ratchet Server ───────────┐
+│  afterCreate/Update/    │ ────────────────────→  │  HTTP on 127.0.0.1:8082    │
+│  Delete → WsPublisher   │                        │         ↓                  │
+│                         │                        │  Channel subscription map  │
+└─────────────────────────┘                        │         ↓                  │
+                                                   │  WebSocket on :8081        │
+                                                   │  ws://host:8081            │
+                                                   └────────────────────────────┘
+                                                             ↓
+                                                   Browser / Mobile clients
+```
+
+- CI4 stays **stateless** — it only publishes, it never manages connections.
+- Ratchet manages all WebSocket connections, channels, and subscriptions in-memory.
+- Two separate ports: `WS_PORT` (8081) for WebSocket clients, `WS_HTTP_PORT` (8082) for internal CI4 publish requests. The HTTP port binds to `127.0.0.1` only and is never exposed externally.
+
+### Setup
+
+**1. Install Ratchet:**
+
+```bash
+composer require cboden/ratchet:^0.4.4
+```
+
+**2. Configure `.env`:**
+
+```
+WS_ENABLED=true
+WS_HOST=127.0.0.1
+WS_PORT=8081
+WS_HTTP_PORT=8082
+WS_SECRET=your-secret-token-here
+```
+
+> `WS_HOST` should be `127.0.0.1` in production — the server binds to localhost only. Change to `0.0.0.0` only if clients connect from other hosts. The HTTP port (`WS_HTTP_PORT`) is always localhost-only.
+
+**3. Start the WebSocket server:**
+
+```bash
+php spark ws:serve
+```
+
+This starts the Ratchet server in the foreground. For production, use a process manager (Supervisor, systemd) to daemonize it.
+
+### Publish an event
+
+```php
+use App\Libraries\WsPublisher;
+
+$publisher = new WsPublisher();
+$publisher->publish('orders', [
+    'action' => 'created',
+    'id'     => 42,
+]);
+```
+
+`WsPublisher` is automatically called from `BaseService` lifecycle hooks — any Service that overrides `afterCreate`, `afterUpdate`, or `afterDelete` will push events without additional code. Channel names are auto-normalized to `model:{resource}` (e.g. `App\Models\OrderModel` → `model:order`).
+
+### Connect from JavaScript
+
+```javascript
+const ws = new WebSocket('ws://localhost:8081');
+
+ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'subscribe', channel: 'orders' }));
+};
+
+ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    // msg = { channel: 'orders', action: 'created', id: 42, data: {...} }
+};
+```
+
+Channel names from `BaseService` are auto-normalized to `model:{resource}`:
+
+```javascript
+// Subscribe to order events (from App\Models\OrderModel → model:order)
+ws.send(JSON.stringify({ type: 'subscribe', channel: 'model:order' }));
+```
+
+### Client protocol
+
+| Message (client → server) | Description |
+|---|---|
+| `{"type":"subscribe","channel":"orders"}` | Subscribe to a channel |
+| `{"type":"unsubscribe","channel":"orders"}` | Unsubscribe from a channel |
+| `{"type":"ping"}` | Keep-alive (server replies `{"type":"pong"}`) |
+
+| Message (server → client) | Description |
+|---|---|
+| `{"type":"welcome","connectionId":"..."}` | Sent on successful connection |
+| `{"type":"pong"}` | Response to client ping |
+| `{"channel":"orders","action":"created","id":42,"data":{...}}` | Event published by CI4 |
+
+### Notes
+
+- When `WS_ENABLED=false`, `WsPublisher::publish()` is a silent no-op — zero overhead.
+- The WsServer validates the `X-WS-Secret` header on every publish request. The CI4 and Ratchet processes must share the same `WS_SECRET` value.
+- Two separate ports: `WS_PORT` (8081) for WebSocket clients, `WS_HTTP_PORT` (8082) for internal CI4 → Ratchet HTTP publish. Firewall `WS_HTTP_PORT` from external access.
+- Channels are created on first subscription. When the last client unsubscribes, the channel is cleaned up.
+- The server runs as a single process. For horizontal scaling, consider a future Redis-backed pub/sub adapter.
+
+---
+
 ## Compatibility Matrix
 
-v3.0 is a **strict superset** of v2.x. No database migrations required to upgrade.
+v4.0 is a **strict superset** of v3.x. No database migrations required to upgrade.
 
-| Feature | v1.x | v2.0 | v3.0 |
-|---|---|---|---|
-| BE Layer (API, Service, Model) | ✅ | ✅ | ✅ |
-| Shield Auth (token-based) | ✅ | ✅ | ✅ |
-| Audit Trail | ✅ | ✅ | ✅ |
-| File Upload + Storage Drivers | ✅ | ✅ | ✅ |
-| Structured JSON Logging | ✅ | ✅ | ✅ |
-| Transformers | ✅ | ✅ | ✅ |
-| SSO Layer (JWT RS256) | ❌ | ✅ optional | ✅ optional |
-| PDF Export (mPDF) | ❌ | ✅ optional | ✅ optional |
-| **TUS Chunked Upload** | ❌ | ❌ | ✅ optional |
-| **Web UI Layer** | ❌ | ❌ | ✅ |
-| **Token-based login (no session)** | ❌ | ❌ | ✅ |
-| **APP_NAME env binding** | ❌ | ❌ | ✅ |
-| **Admin user creation with password** | ❌ | ❌ | ✅ |
+| Feature | v1.x | v2.0 | v3.0 | v4.0 |
+|---|---|---|---|---|
+| BE Layer (API, Service, Model) | ✅ | ✅ | ✅ | ✅ |
+| Shield Auth (token-based) | ✅ | ✅ | ✅ | ✅ |
+| Audit Trail | ✅ | ✅ | ✅ | ✅ |
+| File Upload + Storage Drivers | ✅ | ✅ | ✅ | ✅ |
+| Structured JSON Logging | ✅ | ✅ | ✅ | ✅ |
+| Transformers | ✅ | ✅ | ✅ | ✅ |
+| SSO Layer (JWT RS256) | ❌ | ✅ optional | ✅ optional | ✅ optional |
+| PDF Export (mPDF) | ❌ | ✅ optional | ✅ optional | ✅ optional |
+| **TUS Chunked Upload** | ❌ | ❌ | ✅ optional | ✅ optional |
+| **WebSocket Server (Ratchet)** | ❌ | ❌ | ❌ | ✅ optional |
+| **Web UI Layer** | ❌ | ❌ | ✅ | ✅ |
+| **Token-based login (no session)** | ❌ | ❌ | ✅ | ✅ |
+| **APP_NAME env binding** | ❌ | ❌ | ✅ | ✅ |
+| **Admin user creation with password** | ❌ | ❌ | ✅ | ✅ |
 
 ### Upgrading from v2.x
 
